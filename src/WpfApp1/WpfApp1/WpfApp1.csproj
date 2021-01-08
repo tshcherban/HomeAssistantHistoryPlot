@@ -60,6 +60,7 @@
     </ApplicationDefinition>
     <Compile Include="DataPoint.cs" />
     <Compile Include="HomeAssistantConnector.cs" />
+    <Compile Include="PlotController.cs" />
     <Compile Include="ScottPlotWindow.xaml.cs">
       <DependentUpon>ScottPlotWindow.xaml</DependentUpon>
     </Compile>

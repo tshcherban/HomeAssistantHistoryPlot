@@ -16,16 +16,16 @@ namespace WpfApp1
         private readonly List<Interval> _flameActiveIntervals;
 
         private readonly System.Drawing.Color _boilerTempColor;
-        private readonly System.Drawing.Color  _boilerTargetTempColor;
+        private readonly System.Drawing.Color _boilerTargetTempColor;
 
         public ScottPlotWindow()
         {
             _flameActiveIntervals = new List<Interval>();
 
-            var boilerTargetTempColor = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#AE1313");
+            var boilerTargetTempColor = (System.Windows.Media.Color) System.Windows.Media.ColorConverter.ConvertFromString("#AE1313");
             _boilerTargetTempColor = System.Drawing.Color.FromArgb(boilerTargetTempColor.R, boilerTargetTempColor.G, boilerTargetTempColor.B);
 
-            var boilerTempColor = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#13AEAE");
+            var boilerTempColor = (System.Windows.Media.Color) System.Windows.Media.ColorConverter.ConvertFromString("#13AEAE");
             _boilerTempColor = System.Drawing.Color.FromArgb(boilerTempColor.R, boilerTempColor.G, boilerTempColor.B);
 
             _haConnector = new HomeAssistantConnector();
@@ -58,7 +58,7 @@ namespace WpfApp1
             var dataX = dd.Select(x => x.last_updated.ToOADate()).ToList();
             var dataYb = dd.Select(x => x.state == "1").ToList();
 
-            if (dataYb.Last() && dataX.Last()< maxX)
+            if (dataYb.Last() && dataX.Last() < maxX)
             {
                 dataYb.Add(false);
                 dataX.Add(maxX);
@@ -202,7 +202,7 @@ namespace WpfApp1
 
             wpfPlot2.plt.PlotStep(dataX, dataY);
 
-            var dd1 = _haConnector.GetItems("climate.test_ot", DatePickerFrom.SelectedDate.Value, DatePickerTo.SelectedDate.Value).Where(x=> x.attributes.temperature!=null).Select(x => (last_updated: x.last_updated, state: (double)x.attributes.temperature)).ToList();
+            var dd1 = _haConnector.GetItems("climate.test_ot", DatePickerFrom.SelectedDate.Value, DatePickerTo.SelectedDate.Value).Where(x => x.attributes.temperature != null).Select(x => (last_updated: x.last_updated, state: (double) x.attributes.temperature)).ToList();
 
             if (dd1.Last().last_updated.ToOADate() < maxX)
             {
@@ -221,7 +221,7 @@ namespace WpfApp1
         private bool _bypassAxisChange;
         private bool _bypassScrollChange;
         private PlottableScatter _boilerTempPlot;
-        private HomeAssistantConnector _haConnector;
+        private readonly HomeAssistantConnector _haConnector;
 
         private void CalcBurnerStatsForVisible()
         {
@@ -258,7 +258,7 @@ namespace WpfApp1
             var totalDuration = maxDate - minDate;
             var perc = 100d / totalDuration.TotalSeconds * burnerDuration.TotalSeconds;
 
-            string fts(TimeSpan sp) => $"{(int)sp.TotalHours}:{sp.Minutes:D2}";
+            string fts(TimeSpan sp) => $"{(int) sp.TotalHours}:{sp.Minutes:D2}";
             TextBlockSelectionInfo.Text = $"Burner active for {fts(burnerDuration)} of {fts(totalDuration)} ({perc:F0} %)";
         }
 
@@ -282,7 +282,7 @@ namespace WpfApp1
                 }
             }
 
-            
+
             //TextBlockSelectionInfo2.Text = $"{(set.axes.x.max - set.axes.x.min) /(set.axes.x.boundMax - set.axes.x.boundMin)}";
 
             wpfPlot2.plt.Axis(set.axes.x.min, set.axes.x.max);
