@@ -3,34 +3,45 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using ScottPlot;
+using ScottPlot.Plottable;
 
 namespace WpfApp1
 {
     public partial class ScottPlotWindow
     {
-        private PlottableScatter _integralErrorPLot;
+        private ScatterPlot _integralErrorPLot;
         private bool _closed;
         private readonly List<Interval> _flameActiveIntervals;
 
         private readonly System.Drawing.Color _boilerTempColor;
         private readonly System.Drawing.Color _boilerTargetTempColor;
+        private readonly System.Drawing.Color _flameActiveColor;
+
+        private static System.Drawing.Color ColorFromRGBString(string rgbHex)
+        {
+            var colorObj = System.Windows.Media.ColorConverter.ConvertFromString(rgbHex);
+            if (colorObj == null)
+                throw new ApplicationException($"Failed to convert '{rgbHex}' to color");
+
+            var mediaColor = (System.Windows.Media.Color) colorObj;
+            var ret = System.Drawing.Color.FromArgb(mediaColor.R, mediaColor.G, mediaColor.B);
+
+            return ret;
+        }
 
         public ScottPlotWindow()
         {
             _flameActiveIntervals = new List<Interval>();
 
-            var boilerTargetTempColor = (System.Windows.Media.Color) System.Windows.Media.ColorConverter.ConvertFromString("#AE1313");
-            _boilerTargetTempColor = System.Drawing.Color.FromArgb(boilerTargetTempColor.R, boilerTargetTempColor.G, boilerTargetTempColor.B);
-
-            var boilerTempColor = (System.Windows.Media.Color) System.Windows.Media.ColorConverter.ConvertFromString("#13AEAE");
-            _boilerTempColor = System.Drawing.Color.FromArgb(boilerTempColor.R, boilerTempColor.G, boilerTempColor.B);
+            _boilerTargetTempColor = ColorFromRGBString("#AE1313");
+            _boilerTempColor = ColorFromRGBString("#13AEAE");
+            _flameActiveColor = System.Drawing.Color.FromArgb(25, System.Drawing.Color.IndianRed);
 
             _haConnector = new HomeAssistantConnector();
 
@@ -55,9 +66,9 @@ namespace WpfApp1
             base.OnClosed(e);
         }
 
-        private TimeSpan DrawFlameStatus(double maxX, double minY, double maxY)
+        private TimeSpan DrawFlameStatus(double maxX)
         {
-            var dd = _haConnector.GetItems("sensor.ot_flame_enable", DatePickerFrom.SelectedDate.Value, DatePickerTo.SelectedDate.Value);
+            var dd = _haConnector.GetItems("sensor.ot_flame_enable", _minDate, _maxDate);
 
             var dataX = dd.Select(x => x.last_updated.ToOADate()).ToList();
             var dataYb = dd.Select(x => x.state == "1").ToList();
@@ -68,7 +79,7 @@ namespace WpfApp1
                 dataX.Add(maxX);
             }
 
-            //wpfPlot1.plt.PlotStep(dataX, dataY).color = Color.Red;
+            //wpfPlot1.plt.AddScatter(dataX, dataY).color = Color.Red;
             //wpfPlot1.plt.PlotFill(dataX, dataY);
 
             var prev = false;
@@ -96,7 +107,7 @@ namespace WpfApp1
 
                         total += interval.End - interval.Start;
 
-                        wpfPlot1.plt.PlotHSpan(xPrev.Value, x, System.Drawing.Color.IndianRed, 0.1);
+                        wpfPlot1.plt.AddHorizontalSpan(xPrev.Value, x, _flameActiveColor);
                     }
                 }
 
@@ -126,7 +137,7 @@ namespace WpfApp1
                         var date = DateTime.ParseExact(dateStr, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
                         var value = dd[1].Value<double>();
 
-                        if (date >= DatePickerFrom.SelectedDate.Value && date <= DatePickerTo.SelectedDate.Value)
+                        if (date >= _minDate && date <= _maxDate)
                             ret.Add((date, value));
                     }
                 }
@@ -135,10 +146,21 @@ namespace WpfApp1
             return ret;
         }
 
+        private static ScatterPlot PlotStep(Plot plot, double[] x, double[]y, System.Drawing.Color? color = null)
+        {
+             var scatter = plot.AddScatter(x, y, color, markerSize: 0F, markerShape:MarkerShape.none);
+            scatter.StepDisplay = true;
+
+            return scatter;
+        }
+
         private void InitPlot(bool reset = false)
         {
             if (!DatePickerFrom.SelectedDate.HasValue || !DatePickerTo.SelectedDate.HasValue)
                 return;
+
+            _minDate = DatePickerFrom.SelectedDate.Value;
+            _maxDate = DatePickerTo.SelectedDate.Value;
 
             if (reset)
             {
@@ -159,7 +181,7 @@ namespace WpfApp1
                 return;
             }*/
             
-            var dd = _haConnector.GetItems("sensor.ot_integral_error", DatePickerFrom.SelectedDate.Value, DatePickerTo.SelectedDate.Value).Where(x => x.state != "unknown").ToList();
+            var dd = _haConnector.GetItems("sensor.ot_integral_error", _minDate, _maxDate).Where(x => x.state != "unknown").ToList();
 
             var dataX = dd.Select(x => x.last_updated.ToOADate()).ToArray();
             var dataY = dd.Select(x => double.Parse(x.state, CultureInfo.InvariantCulture)).ToArray();
@@ -169,10 +191,10 @@ namespace WpfApp1
             var minY = dataY.Min();
             var maxY = dataY.Max();
 
-            _integralErrorPLot = wpfPlot1.plt.PlotStep(dataX, dataY);
-            _integralErrorPLot.visible = false;
+            _integralErrorPLot = PlotStep(wpfPlot1.plt, dataX, dataY);
+            _integralErrorPLot.IsVisible = false;
 
-            dd = _haConnector.GetItems("sensor.boiler_temperature", DatePickerFrom.SelectedDate.Value, DatePickerTo.SelectedDate.Value).Where(x => x.state != "unknown" && x.state != "0.00").ToList();
+            dd = _haConnector.GetItems("sensor.boiler_temperature", _minDate, _maxDate).Where(x => x.state != "unknown" && x.state != "0.00").ToList();
 
             dataX = dd.Select(x => x.last_updated.ToOADate()).ToArray();
             dataY = dd.Select(x => double.Parse(x.state, CultureInfo.InvariantCulture)).ToArray();
@@ -184,15 +206,14 @@ namespace WpfApp1
 
             if (!reset)
             {
-                _boilerTempPlot.xs = dataX;
-                _boilerTempPlot.ys = dataY;
+                _boilerTempPlot.Update(dataX, dataY);
             }
             else
             {
-                _boilerTempPlot = wpfPlot1.plt.PlotStep(dataX, dataY, _boilerTempColor);
+                _boilerTempPlot = PlotStep(wpfPlot1.plt, dataX, dataY, _boilerTempColor);
             }
 
-            dd = _haConnector.GetItems("sensor.boiler_target_temperature", DatePickerFrom.SelectedDate.Value, DatePickerTo.SelectedDate.Value).Where(x => x.state != "unknown" && x.state != "0.00").ToList();
+            dd = _haConnector.GetItems("sensor.boiler_target_temperature", _minDate, _maxDate).Where(x => x.state != "unknown" && x.state != "0.00").ToList();
 
             if (dd.Last().last_updated.ToOADate() < maxX)
             {
@@ -211,27 +232,27 @@ namespace WpfApp1
             minY = Math.Min(dataY.Min(), minY);
             maxY = Math.Max(dataY.Max(), maxY);
 
-            wpfPlot1.plt.PlotStep(dataX, dataY, _boilerTargetTempColor);
+            PlotStep(wpfPlot1.plt, dataX, dataY, _boilerTargetTempColor);
 
-            var burnerActive = DrawFlameStatus(maxX, minY, maxY);
+            var burnerActive = DrawFlameStatus(maxX);
             var totalDuration = DateTime.FromOADate(maxX) - DateTime.FromOADate(minX);
-            var perc = 100d / totalDuration.TotalSeconds * burnerActive.TotalSeconds;
+            var burnerActiveTotalSeconds = 100d / totalDuration.TotalSeconds * burnerActive.TotalSeconds;
 
-            string fts(TimeSpan sp) => $"{(int) sp.TotalHours}:{sp.Minutes:D2}";
-
-            InfoTextBlock.Text = $"Burner active for {fts(burnerActive)} of {fts(totalDuration)} ({perc:F0} %)";
+            InfoTextBlock.Text = $"Burner active for {FormatTimeSpan(burnerActive)} of {FormatTimeSpan(totalDuration)} ({burnerActiveTotalSeconds:F0} %)";
 
             var marginX = 0.01 * (maxX - minX);
             var marginY = 0.05 * (maxY - minY);
 
-            wpfPlot1.plt.AxisBounds(minX - marginX, maxX + marginX, minY - marginY, maxY + marginY);
-            wpfPlot1.plt.Ticks(dateTimeX: true);
+            wpfPlot1.plt.XAxis.Dims.SetBounds(minX - marginX, maxX + marginX);
+            wpfPlot1.plt.YAxis.Dims.SetBounds(minY - marginY, maxY + marginY);
+
+            wpfPlot1.plt.XAxis.TickLabelFormat(null, true);
             wpfPlot1.Render();
 
             PlotScroll.Minimum = minX - marginX;
             PlotScroll.Maximum = maxX + marginX;
 
-            dd = _haConnector.GetItems("sensor.living_temp", DatePickerFrom.SelectedDate.Value, DatePickerTo.SelectedDate.Value).Where(x => x.state != "unknown").ToList();
+            dd = _haConnector.GetItems("sensor.living_temp", _minDate, _maxDate).Where(x => x.state != "unknown").ToList();
 
             if (dd.Last().last_updated.ToOADate() < maxX)
             {
@@ -245,9 +266,9 @@ namespace WpfApp1
             dataX = dd.Select(x => x.last_updated.ToOADate()).ToArray();
             dataY = dd.Select(x => double.Parse(x.state, CultureInfo.InvariantCulture)).ToArray();
 
-            wpfPlot2.plt.PlotStep(dataX, dataY);
+            PlotStep(wpfPlot2.plt, dataX, dataY);
 
-            var dd1 = _haConnector.GetItems("climate.test_ot", DatePickerFrom.SelectedDate.Value, DatePickerTo.SelectedDate.Value).Where(x => x.attributes.temperature != null).Select(x => (last_updated: x.last_updated, state: (double) x.attributes.temperature)).ToList();
+            var dd1 = _haConnector.GetItems("climate.test_ot", _minDate, _maxDate).Where(x => x.attributes.temperature != null).Select(x => (last_updated: x.last_updated, state: (double) x.attributes.temperature)).ToList();
 
             if (dd1.Last().last_updated.ToOADate() < maxX)
             {
@@ -256,24 +277,24 @@ namespace WpfApp1
 
             dataX = dd1.Select(x => x.last_updated.ToOADate()).ToArray();
             dataY = dd1.Select(x => x.state).ToArray();
-            wpfPlot2.plt.PlotStep(dataX, dataY);
+            PlotStep(wpfPlot2.plt, dataX, dataY);
 
-            wpfPlot2.plt.AxisBounds(minX - marginX, maxX + marginX);
-            wpfPlot2.plt.Ticks(dateTimeX: true);
+            wpfPlot2.plt.XAxis.Dims.SetBounds(minX - marginX, maxX + marginX);
+            wpfPlot2.plt.XAxis.TickLabelFormat("g", true);
             wpfPlot2.Render();
         }
 
         private bool _bypassAxisChange;
         private bool _bypassScrollChange;
-        private PlottableScatter _boilerTempPlot;
+        private ScatterPlot _boilerTempPlot;
         private readonly HomeAssistantConnector _haConnector;
+        private DateTime _minDate;
+        private DateTime _maxDate;
 
         private void CalcBurnerStatsForVisible()
         {
-            var set = wpfPlot1.plt.GetSettings();
-
-            var minDate = DateTime.FromOADate(set.axes.x.min);
-            var maxDate = DateTime.FromOADate(set.axes.x.max);
+            var minDate = DateTime.FromOADate(wpfPlot1.plt.XAxis.Dims.Min);
+            var maxDate = DateTime.FromOADate(wpfPlot1.plt.XAxis.Dims.Max);
 
             var inRange = _flameActiveIntervals
                 .Where(x => x.End >= minDate && x.End <= maxDate || x.Start >= minDate && x.Start <= maxDate || minDate >= x.Start && maxDate <= x.End)
@@ -301,16 +322,16 @@ namespace WpfApp1
             }
 
             var totalDuration = maxDate - minDate;
-            var perc = 100d / totalDuration.TotalSeconds * burnerDuration.TotalSeconds;
+            var burnerDurationTotalSeconds = 100d / totalDuration.TotalSeconds * burnerDuration.TotalSeconds;
 
-            string fts(TimeSpan sp) => $"{(int) sp.TotalHours}:{sp.Minutes:D2}";
-            TextBlockSelectionInfo.Text = $"Burner active for {fts(burnerDuration)} of {fts(totalDuration)} ({perc:F0} %)";
+            
+            TextBlockSelectionInfo.Text = $"Burner active for {FormatTimeSpan(burnerDuration)} of {FormatTimeSpan(totalDuration)} ({burnerDurationTotalSeconds:F0} %)";
         }
+
+        private static string FormatTimeSpan(TimeSpan sp) => $"{(int) sp.TotalHours}:{sp.Minutes:D2}";
 
         private void WpfPlot1_OnAxisChanged(object sender, EventArgs e)
         {
-            var set = wpfPlot1.plt.GetSettings();
-
             CalcBurnerStatsForVisible();
 
             if (!_bypassAxisChange)
@@ -318,8 +339,8 @@ namespace WpfApp1
                 try
                 {
                     _bypassScrollChange = true;
-                    PlotScroll.Value = set.axes.x.center;
-                    PlotScroll.ViewportSize = (set.axes.x.max - set.axes.x.min) / (set.axes.x.boundMax - set.axes.x.boundMin);
+                    PlotScroll.Value = wpfPlot1.plt.XAxis.Dims.Center;
+                    PlotScroll.ViewportSize = (wpfPlot1.plt.XAxis.Dims.Max - wpfPlot1.plt.XAxis.Dims.Min) / (wpfPlot1.plt.XAxis.Dims.UpperBound - wpfPlot1.plt.XAxis.Dims.LowerBound);
                 }
                 finally
                 {
@@ -328,21 +349,19 @@ namespace WpfApp1
             }
 
 
-            //TextBlockSelectionInfo2.Text = $"{(set.axes.x.max - set.axes.x.min) /(set.axes.x.boundMax - set.axes.x.boundMin)}";
-
-            wpfPlot2.plt.Axis(set.axes.x.min, set.axes.x.max);
+            wpfPlot2.plt.SetAxisLimits(wpfPlot1.plt.XAxis.Dims.Min, wpfPlot1.plt.XAxis.Dims.Max);
             wpfPlot2.Render();
         }
 
         private void ToggleButton_OnUnchecked(object sender, RoutedEventArgs e)
         {
-            _integralErrorPLot.visible = false;
+            _integralErrorPLot.IsVisible = false;
             wpfPlot1.Render();
         }
 
         private void ToggleButton_OnChecked(object sender, RoutedEventArgs e)
         {
-            _integralErrorPLot.visible = true;
+            _integralErrorPLot.IsVisible = true;
             wpfPlot1.Render();
         }
 
@@ -356,25 +375,24 @@ namespace WpfApp1
             if (_bypassScrollChange)
                 return;
 
-            var set = wpfPlot1.plt.GetSettings();
-            var range = set.axes.x.max - set.axes.x.min;
+            var range = wpfPlot1.plt.XAxis.Dims.Span;
 
             var minX = PlotScroll.Value - range / 2;
             var maxX = PlotScroll.Value + range / 2;
 
-            if (minX < set.axes.x.boundMin)
+            if (minX < wpfPlot1.plt.XAxis.Dims.LowerBound)
                 return;
 
-            if (maxX > set.axes.x.boundMax)
+            if (maxX > wpfPlot1.plt.XAxis.Dims.UpperBound)
                 return;
 
             try
             {
                 _bypassAxisChange = true;
-                wpfPlot1.plt.Axis(minX, maxX);
+                wpfPlot1.plt.SetAxisLimits(minX, maxX);
                 wpfPlot1.Render();
 
-                wpfPlot2.plt.Axis(minX, maxX);
+                wpfPlot2.plt.SetAxisLimits(minX, maxX);
                 wpfPlot2.Render();
 
                 CalcBurnerStatsForVisible();
