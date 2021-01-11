@@ -168,6 +168,10 @@ namespace WpfApp1
                 wpfPlot2.Reset();
             }
 
+            var spans = wpfPlot1.plt.GetPlottables().OfType<HSpan>().ToList();
+            foreach (var sp in spans)
+                wpfPlot1.plt.Remove(sp);
+
             /*var counterData = GetGasConsumption();
             if (counterData.Count > 0)
             {
@@ -180,7 +184,7 @@ namespace WpfApp1
                 wpfPlot1.Render();
                 return;
             }*/
-            
+
             var dd = _haConnector.GetItems("sensor.ot_integral_error", _minDate, _maxDate).Where(x => x.state != "unknown").ToList();
 
             var dataX = dd.Select(x => x.last_updated.ToOADate()).ToArray();
