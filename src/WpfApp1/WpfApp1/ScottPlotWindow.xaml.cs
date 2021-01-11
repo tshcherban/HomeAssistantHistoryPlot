@@ -2,9 +2,13 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Net.Http;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using ScottPlot;
 
 namespace WpfApp1
@@ -103,6 +107,34 @@ namespace WpfApp1
             return total;
         }
 
+        private List<(DateTime date, double value)> GetGasConsumption()
+        {
+            var ret = new List<(DateTime date, double value)>();
+
+            using (var httpClient = new HttpClient())
+            {
+                const string resUrl = "";
+                using (var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, resUrl))
+                {
+                    var resp = httpClient.SendAsync(httpRequestMessage).Result;
+                    var jsonStr = resp.Content.ReadAsStringAsync().Result;
+                    
+                    var data = JsonConvert.DeserializeObject<JArray>(jsonStr);
+                    foreach (var dd in data)
+                    {
+                        var dateStr = dd[0].Value<string>();
+                        var date = DateTime.ParseExact(dateStr, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                        var value = dd[1].Value<double>();
+
+                        if (date >= DatePickerFrom.SelectedDate.Value && date <= DatePickerTo.SelectedDate.Value)
+                            ret.Add((date, value));
+                    }
+                }
+            }
+
+            return ret;
+        }
+
         private void InitPlot(bool reset = false)
         {
             if (!DatePickerFrom.SelectedDate.HasValue || !DatePickerTo.SelectedDate.HasValue)
@@ -114,6 +146,19 @@ namespace WpfApp1
                 wpfPlot2.Reset();
             }
 
+            /*var counterData = GetGasConsumption();
+            if (counterData.Count > 0)
+            {
+                wpfPlot1.Reset();
+
+                var dx = counterData.Select(x => x.date.ToOADate()).ToArray();
+                var dy = counterData.Select(x => x.value).ToArray();
+                wpfPlot1.plt.PlotScatter(dx, dy);
+                wpfPlot1.plt.Ticks(dateTimeX: true);
+                wpfPlot1.Render();
+                return;
+            }*/
+            
             var dd = _haConnector.GetItems("sensor.ot_integral_error", DatePickerFrom.SelectedDate.Value, DatePickerTo.SelectedDate.Value).Where(x => x.state != "unknown").ToList();
 
             var dataX = dd.Select(x => x.last_updated.ToOADate()).ToArray();
@@ -147,7 +192,7 @@ namespace WpfApp1
                 _boilerTempPlot = wpfPlot1.plt.PlotStep(dataX, dataY, _boilerTempColor);
             }
 
-            dd = _haConnector.GetItems("sensor.boiler_target_temperature", DatePickerFrom.SelectedDate.Value, DatePickerTo.SelectedDate.Value).Where(x => x.state != "unknown").ToList();
+            dd = _haConnector.GetItems("sensor.boiler_target_temperature", DatePickerFrom.SelectedDate.Value, DatePickerTo.SelectedDate.Value).Where(x => x.state != "unknown" && x.state != "0.00").ToList();
 
             if (dd.Last().last_updated.ToOADate() < maxX)
             {
@@ -303,7 +348,7 @@ namespace WpfApp1
 
         private void DatePicker_OnSelectedDateChanged(object sender, SelectionChangedEventArgs e)
         {
-            InitPlot();
+            InitPlot(true);
         }
 
         private void PlotScroll_OnScroll(object sender, ScrollEventArgs e)
@@ -340,7 +385,7 @@ namespace WpfApp1
             }
         }
 
-        private void ButtonBase_OnClick(object sender, RoutedEventArgs e)
+        private void RefreshBtn_OnClick(object sender, RoutedEventArgs e)
         {
             InitPlot();
         }

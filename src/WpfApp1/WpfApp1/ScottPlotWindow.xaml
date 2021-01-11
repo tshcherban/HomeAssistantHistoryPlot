@@ -34,7 +34,7 @@
             <TextBlock Grid.Column="2" Grid.Row="0" x:Name="TextBlockSelectionInfo" HorizontalAlignment="Left" VerticalAlignment="Top" />
             <TextBlock Grid.Column="2" Grid.Row="1" x:Name="TextBlockSelectionInfo2" HorizontalAlignment="Left" VerticalAlignment="Top" />
 
-            <Button Grid.Column="3" Content="Refresh" Click="ButtonBase_OnClick"/>
+            <Button Grid.Column="3" Content="Refresh" Click="RefreshBtn_OnClick"/>
         </Grid>
 
         <WpfPlot Grid.Row="1" Name="wpfPlot1" UseLayoutRounding="True" AxisChanged="WpfPlot1_OnAxisChanged" />
