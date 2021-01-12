@@ -284,7 +284,7 @@ namespace WpfApp1
             PlotStep(wpfPlot2.plt, dataX, dataY);
 
             wpfPlot2.plt.XAxis.Dims.SetBounds(minX - marginX, maxX + marginX);
-            wpfPlot2.plt.XAxis.TickLabelFormat("g", true);
+            wpfPlot2.plt.XAxis.TickLabelFormat(null, true);
             wpfPlot2.Render();
         }
 
