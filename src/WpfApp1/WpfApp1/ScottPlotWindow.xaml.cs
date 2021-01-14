@@ -256,6 +256,8 @@ namespace WpfApp1
             PlotScroll.Minimum = minX - marginX;
             PlotScroll.Maximum = maxX + marginX;
 
+            wpfPlot2.plt.Clear();
+
             dd = _haConnector.GetItems("sensor.living_temp", _minDate, _maxDate).Where(x => x.state != "unknown").ToList();
 
             if (dd.Last().last_updated.ToOADate() < maxX)
@@ -285,6 +287,7 @@ namespace WpfApp1
 
             wpfPlot2.plt.XAxis.Dims.SetBounds(minX - marginX, maxX + marginX);
             wpfPlot2.plt.XAxis.TickLabelFormat(null, true);
+            wpfPlot2.plt.SetAxisLimits(wpfPlot1.plt.XAxis.Dims.Min, wpfPlot1.plt.XAxis.Dims.Max);
             wpfPlot2.Render();
         }
 
