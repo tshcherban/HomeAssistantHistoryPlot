@@ -31,23 +31,20 @@ namespace WpfApp1
 
         private static string FormatDate(DateTime dt) => dt.ToString("yyyy-MM-ddTHH:mm:ss.ffffff") + "+02:00";
 
-        public List<DataPoint> GetItems(string entityId, DateTime startDate, DateTime endDate)
+        public async Task<List<DataPoint>> GetItems(string entityId, DateTime startDate, DateTime endDate)
         {
-            return Task.Run(() =>
+            using (var httpClient = new HttpClient())
             {
-                using (var httpClient = new HttpClient())
+                var startTime = FormatDate(startDate);
+                var endTime = FormatDate(endDate.AddDays(1).AddTicks(-1));
+                var resUrl = $"{_historyBaseUrl}/{startTime}?filter_entity_id={entityId}&end_time={WebUtility.UrlEncode(endTime)}";
+                using (var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, resUrl) {Headers = {Authorization = new AuthenticationHeaderValue("Bearer", _authToken)}})
                 {
-                    var startTime = FormatDate(startDate);
-                    var endTime = FormatDate(endDate.AddDays(1).AddTicks(-1));
-                    var resUrl = $"{_historyBaseUrl}/{startTime}?filter_entity_id={entityId}&end_time={WebUtility.UrlEncode(endTime)}";
-                    using (var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, resUrl) {Headers = {Authorization = new AuthenticationHeaderValue("Bearer", _authToken)}})
-                    {
-                        var resp = httpClient.SendAsync(httpRequestMessage).Result;
-                        var jsonStr = resp.Content.ReadAsStringAsync().Result;
-                        return JsonConvert.DeserializeObject<List<List<DataPoint>>>(jsonStr)[0];
-                    }
+                    var resp = await httpClient.SendAsync(httpRequestMessage);
+                    var jsonStr = await resp.Content.ReadAsStringAsync();
+                    return JsonConvert.DeserializeObject<List<List<DataPoint>>>(jsonStr)[0];
                 }
-            }).Result;
+            }
         }
 
         public List<(DateTime date, double value)> GetGasConsumption(DateTime minDate, DateTime maxDate)

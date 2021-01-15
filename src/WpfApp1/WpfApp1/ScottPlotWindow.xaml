@@ -39,8 +39,20 @@
         </Grid>
 
         <WpfPlot Grid.Row="1" Height="150" Margin="0" x:Name="WpfPlotGasData"/>
+        <Border Grid.Row="1" x:Name="WpfPlotGasLoadingBlock" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="Gray" Opacity="0.2">
+            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="Loading..." FontSize="16" />
+        </Border>
+
         <WpfPlot Grid.Row="2" Margin="0" x:Name="WpfPlotBoiler" UseLayoutRounding="True" AxisChanged="WpfPlot1_OnAxisChanged" />
+        <Border Grid.Row="2" x:Name="WpfPlotBoilerLoadingBlock" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="Gray" Opacity="0.2">
+            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="Loading..." FontSize="16" />
+        </Border>
+        
         <ScrollBar Grid.Row="3" Orientation="Horizontal" x:Name="PlotScroll" Scroll="PlotScroll_OnScroll"/>
+        
         <WpfPlot Grid.Row="4" Margin="0" x:Name="WpfPlotRoom" UseLayoutRounding="True" />
+        <Border Grid.Row="4" x:Name="WpfPlotRoomLoadingBlock" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="Gray" Opacity="0.2">
+            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="Loading..." FontSize="16" />
+        </Border>
     </Grid>
 </Window>

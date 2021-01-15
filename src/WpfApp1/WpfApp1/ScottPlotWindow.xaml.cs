@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Linq;
-using System.Net.Http;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using System.Windows.Media.Effects;
+using System.Windows.Threading;
 using ScottPlot;
 using ScottPlot.Plottable;
 
@@ -16,30 +16,28 @@ namespace WpfApp1
 {
     public partial class ScottPlotWindow
     {
-        private ScatterPlot _integralErrorPLot;
-        private bool _closed;
         private readonly List<Interval> _flameActiveIntervals;
-
-        private readonly System.Drawing.Color _boilerTempColor;
-        private readonly System.Drawing.Color _boilerTargetTempColor;
-        private readonly System.Drawing.Color _flameActiveColor;
-
+        private readonly Color _boilerTempColor;
+        private readonly Color _boilerTargetTempColor;
+        private readonly Color _flameActiveColor;
         private readonly DataReader _haConnector;
 
+        private bool _closed;
         private bool _bypassAxisChange;
         private bool _bypassScrollChange;
-        private ScatterPlot _boilerTempPlot;
         private DateTime _minDate;
         private DateTime _maxDate;
+        private ScatterPlot _boilerTempPlot;
+        private ScatterPlot _integralErrorPLot;
 
-        private static System.Drawing.Color ColorFromRGBString(string rgbHex)
+        private static Color ColorFromRGBString(string rgbHex)
         {
             var colorObj = System.Windows.Media.ColorConverter.ConvertFromString(rgbHex);
             if (colorObj == null)
                 throw new ApplicationException($"Failed to convert '{rgbHex}' to color");
 
             var mediaColor = (System.Windows.Media.Color) colorObj;
-            var ret = System.Drawing.Color.FromArgb(mediaColor.R, mediaColor.G, mediaColor.B);
+            var ret = Color.FromArgb(mediaColor.R, mediaColor.G, mediaColor.B);
 
             return ret;
         }
@@ -50,7 +48,7 @@ namespace WpfApp1
 
             _boilerTargetTempColor = ColorFromRGBString("#AE1313");
             _boilerTempColor = ColorFromRGBString("#13AEAE");
-            _flameActiveColor = System.Drawing.Color.FromArgb(25, System.Drawing.Color.IndianRed);
+            _flameActiveColor = Color.FromArgb(25, Color.IndianRed);
 
             _haConnector = rdr;
 
@@ -77,9 +75,9 @@ namespace WpfApp1
             base.OnClosed(e);
         }
 
-        private TimeSpan DrawFlameStatus(double maxX)
+        private async Task<TimeSpan> DrawFlameStatus(double maxX)
         {
-            var dd = _haConnector.GetItems("sensor.ot_flame_enable", _minDate, _maxDate);
+            var dd = await _haConnector.GetItems("sensor.ot_flame_enable", _minDate, _maxDate);
 
             var dataX = dd.Select(x => x.last_updated.ToOADate()).ToList();
             var dataYb = dd.Select(x => x.state == "1").ToList();
@@ -129,7 +127,7 @@ namespace WpfApp1
             return total;
         }
 
-        private static ScatterPlot PlotStep(Plot plot, double[] x, double[]y, System.Drawing.Color? color = null)
+        private static ScatterPlot PlotStep(Plot plot, double[] x, double[]y, Color? color = null)
         {
              var scatter = plot.AddScatter(x, y, color, markerSize: 0F, markerShape:MarkerShape.none);
             scatter.StepDisplay = true;
@@ -137,13 +135,26 @@ namespace WpfApp1
             return scatter;
         }
 
-        private void InitPlot(bool reset = false)
+        private async void InitPlot(bool reset = false)
         {
             if (!DatePickerFrom.SelectedDate.HasValue || !DatePickerTo.SelectedDate.HasValue)
                 return;
 
             _minDate = DatePickerFrom.SelectedDate.Value;
             _maxDate = DatePickerTo.SelectedDate.Value;
+
+            await Task.Yield();
+
+            WpfPlotBoilerLoadingBlock.Visibility = Visibility.Visible;
+            WpfPlotBoiler.Effect = new BlurEffect {KernelType = KernelType.Gaussian, Radius = 5};
+
+            WpfPlotRoomLoadingBlock.Visibility = Visibility.Visible;
+            WpfPlotRoom.Effect = new BlurEffect { KernelType = KernelType.Gaussian, Radius = 5 };
+
+            WpfPlotGasLoadingBlock.Visibility = Visibility.Visible;
+            WpfPlotGasData.Effect = new BlurEffect { KernelType = KernelType.Gaussian, Radius = 5 };
+
+            await Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() => { }));
 
             if (reset)
             {
@@ -168,7 +179,7 @@ namespace WpfApp1
                 return;
             }*/
 
-            var dd = _haConnector.GetItems("sensor.ot_integral_error", _minDate, _maxDate).Where(x => x.state != "unknown").ToList();
+            var dd = (await _haConnector.GetItems("sensor.ot_integral_error", _minDate, _maxDate)).Where(x => x.state != "unknown").ToList();
 
             var dataX = dd.Select(x => x.last_updated.ToOADate()).ToArray();
             var dataY = dd.Select(x => double.Parse(x.state, CultureInfo.InvariantCulture)).ToArray();
@@ -181,7 +192,7 @@ namespace WpfApp1
             _integralErrorPLot = PlotStep(WpfPlotBoiler.plt, dataX, dataY);
             _integralErrorPLot.IsVisible = false;
 
-            dd = _haConnector.GetItems("sensor.boiler_temperature", _minDate, _maxDate).Where(x => x.state != "unknown" && x.state != "0.00").ToList();
+            dd = (await _haConnector.GetItems("sensor.boiler_temperature", _minDate, _maxDate)).Where(x => x.state != "unknown" && x.state != "0.00").ToList();
 
             dataX = dd.Select(x => x.last_updated.ToOADate()).ToArray();
             dataY = dd.Select(x => double.Parse(x.state, CultureInfo.InvariantCulture)).ToArray();
@@ -200,7 +211,7 @@ namespace WpfApp1
                 _boilerTempPlot = PlotStep(WpfPlotBoiler.plt, dataX, dataY, _boilerTempColor);
             }
 
-            dd = _haConnector.GetItems("sensor.boiler_target_temperature", _minDate, _maxDate).Where(x => x.state != "unknown" && x.state != "0.00").ToList();
+            dd = (await _haConnector.GetItems("sensor.boiler_target_temperature", _minDate, _maxDate)).Where(x => x.state != "unknown" && x.state != "0.00").ToList();
 
             if (dd.Last().last_updated.ToOADate() < maxX)
             {
@@ -221,7 +232,7 @@ namespace WpfApp1
 
             PlotStep(WpfPlotBoiler.plt, dataX, dataY, _boilerTargetTempColor);
 
-            var burnerActive = DrawFlameStatus(maxX);
+            var burnerActive = await DrawFlameStatus(maxX);
             var totalDuration = DateTime.FromOADate(maxX) - DateTime.FromOADate(minX);
             var burnerActiveTotalSeconds = 100d / totalDuration.TotalSeconds * burnerActive.TotalSeconds;
 
@@ -239,9 +250,13 @@ namespace WpfApp1
             PlotScroll.Minimum = minX - marginX;
             PlotScroll.Maximum = maxX + marginX;
 
+            WpfPlotBoilerLoadingBlock.Visibility = Visibility.Collapsed;
+            WpfPlotBoiler.Effect = null;
+            await Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() => { }));
+
             WpfPlotRoom.plt.Clear();
 
-            dd = _haConnector.GetItems("sensor.living_temp", _minDate, _maxDate).Where(x => x.state != "unknown").ToList();
+            dd = (await _haConnector.GetItems("sensor.living_temp", _minDate, _maxDate)).Where(x => x.state != "unknown").ToList();
 
             if (dd.Last().last_updated.ToOADate() < maxX)
             {
@@ -257,7 +272,7 @@ namespace WpfApp1
 
             PlotStep(WpfPlotRoom.plt, dataX, dataY);
 
-            var dd1 = _haConnector.GetItems("climate.test_ot", _minDate, _maxDate).Where(x => x.attributes.temperature != null).Select(x => (last_updated: x.last_updated, state: (double) x.attributes.temperature)).ToList();
+            var dd1 = (await _haConnector.GetItems("climate.test_ot", _minDate, _maxDate)).Where(x => x.attributes.temperature != null).Select(x => (last_updated: x.last_updated, state: (double) x.attributes.temperature)).ToList();
 
             if (dd1.Last().last_updated.ToOADate() < maxX)
             {
@@ -273,6 +288,11 @@ namespace WpfApp1
             WpfPlotRoom.plt.SetAxisLimits(WpfPlotBoiler.plt.XAxis.Dims.Min, WpfPlotBoiler.plt.XAxis.Dims.Max);
             WpfPlotRoom.Render();
 
+            WpfPlotRoomLoadingBlock.Visibility = Visibility.Collapsed;
+            WpfPlotRoom.Effect = null;
+
+            await Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() => { }));
+
             WpfPlotGasData.plt.Clear();
 
             var gasData = _haConnector.GetGasConsumption(_minDate, _maxDate.AddDays(1).AddTicks(-1));
@@ -284,7 +304,7 @@ namespace WpfApp1
                 WpfPlotGasData.plt.AddVerticalLine(g.date.ToOADate(), Color.Blue);
                 //WpfPlotBoiler.plt.AddVerticalLine(g.date.ToOADate(), Color.Blue);
 
-                if (prevAmount.HasValue && prevDate.HasValue)
+                if (prevAmount.HasValue)
                 {
                     var amount = g.value - prevAmount.Value;
                     var rate = amount / (g.date - DateTime.FromOADate(prevDate.Value)).TotalDays;
@@ -300,6 +320,9 @@ namespace WpfApp1
             WpfPlotGasData.plt.XAxis.TickLabelFormat(null, true);
             WpfPlotGasData.plt.SetAxisLimits(WpfPlotBoiler.plt.XAxis.Dims.Min, WpfPlotBoiler.plt.XAxis.Dims.Max, 0, 20);
             WpfPlotGasData.Render();
+
+            WpfPlotGasLoadingBlock.Visibility = Visibility.Collapsed;
+            WpfPlotGasData.Effect = null;
         }
 
         private void CalcBurnerStatsForVisible()
