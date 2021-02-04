@@ -179,7 +179,7 @@ namespace WpfApp1
                 return;
             }*/
 
-            var dd = (await _haConnector.GetItems("sensor.ot_integral_error", _minDate, _maxDate)).Where(x => x.state != "unknown").ToList();
+            var dd = (await _haConnector.GetItems("sensor.ot_integral_error", _minDate, _maxDate)).Where(x => x.state != null && x.state != "unknown").ToList();
 
             var dataX = dd.Select(x => x.last_updated.ToOADate()).ToArray();
             var dataY = dd.Select(x => double.Parse(x.state, CultureInfo.InvariantCulture)).ToArray();
@@ -192,7 +192,7 @@ namespace WpfApp1
             _integralErrorPLot = PlotStep(WpfPlotBoiler.plt, dataX, dataY);
             _integralErrorPLot.IsVisible = false;
 
-            dd = (await _haConnector.GetItems("sensor.boiler_temperature", _minDate, _maxDate)).Where(x => x.state != "unknown" && x.state != "0.00").ToList();
+            dd = (await _haConnector.GetItems("sensor.boiler_temperature", _minDate, _maxDate)).Where(x => x.state != null && x.state != "unknown" && x.state != "0.00").ToList();
 
             dataX = dd.Select(x => x.last_updated.ToOADate()).ToArray();
             dataY = dd.Select(x => double.Parse(x.state, CultureInfo.InvariantCulture)).ToArray();
@@ -211,7 +211,7 @@ namespace WpfApp1
                 _boilerTempPlot = PlotStep(WpfPlotBoiler.plt, dataX, dataY, _boilerTempColor);
             }
 
-            dd = (await _haConnector.GetItems("sensor.boiler_target_temperature", _minDate, _maxDate)).Where(x => x.state != "unknown" && x.state != "0.00").ToList();
+            dd = (await _haConnector.GetItems("sensor.boiler_target_temperature", _minDate, _maxDate)).Where(x => x.state != null && x.state != "unknown" && x.state != "0.00").ToList();
 
             if (dd.Last().last_updated.ToOADate() < maxX)
             {
@@ -256,7 +256,7 @@ namespace WpfApp1
 
             WpfPlotRoom.plt.Clear();
 
-            dd = (await _haConnector.GetItems("sensor.living_temp", _minDate, _maxDate)).Where(x => x.state != "unknown").ToList();
+            dd = (await _haConnector.GetItems("sensor.living_temp", _minDate, _maxDate)).Where(x => x.state!= null && x.state != "unknown").ToList();
 
             if (dd.Last().last_updated.ToOADate() < maxX)
             {
