@@ -47,37 +47,34 @@ namespace WpfApp1
             }
         }
 
-        public List<(DateTime date, double value)> GetGasConsumption(DateTime minDate, DateTime maxDate)
+        public async Task<List<(DateTime date, double value)>> GetGasConsumption(DateTime minDate, DateTime maxDate)
         {
-            return Task.Run(() =>
+            var ret = new List<(DateTime date, double value)>();
+
+            using (var httpClient = new HttpClient())
             {
-                var ret = new List<(DateTime date, double value)>();
-
-                using (var httpClient = new HttpClient())
+                using (var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, _gasDataUrl))
                 {
-                    using (var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, _gasDataUrl))
+                    var resp = await httpClient.SendAsync(httpRequestMessage);
+                    var jsonStr = await resp.Content.ReadAsStringAsync();
+
+                    var data = JsonConvert.DeserializeObject<JArray>(jsonStr);
+                    foreach (var dd in data.Skip(1))
                     {
-                        var resp = httpClient.SendAsync(httpRequestMessage).Result;
-                        var jsonStr = resp.Content.ReadAsStringAsync().Result;
+                        var dateStr = dd[0].Value<string>();
+                        if (string.IsNullOrEmpty(dateStr))
+                            continue;
 
-                        var data = JsonConvert.DeserializeObject<JArray>(jsonStr);
-                        foreach (var dd in data.Skip(1))
-                        {
-                            var dateStr = dd[0].Value<string>();
-                            if (string.IsNullOrEmpty(dateStr))
-                                continue;
+                        var date = DateTime.ParseExact(dateStr, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                        var value = dd[1].Value<double>();
 
-                            var date = DateTime.ParseExact(dateStr, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-                            var value = dd[1].Value<double>();
-
-                            if (date >= minDate && date <= maxDate)
-                                ret.Add((date, value));
-                        }
+                        if (date >= minDate && date <= maxDate)
+                            ret.Add((date, value));
                     }
                 }
+            }
 
-                return ret;
-            }).Result;
+            return ret;
         }
     }
 }

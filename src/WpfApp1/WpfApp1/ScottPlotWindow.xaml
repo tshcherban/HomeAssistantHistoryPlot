@@ -43,7 +43,7 @@
             <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="Loading..." FontSize="16" />
         </Border>
 
-        <WpfPlot Grid.Row="2" Margin="0" x:Name="WpfPlotBoiler" UseLayoutRounding="True" AxisChanged="WpfPlot1_OnAxisChanged" />
+        <WpfPlot Grid.Row="2" Margin="0" x:Name="WpfPlotBoiler" UseLayoutRounding="True" AxisChanged="WpfPlot1_OnAxisChanged" PreviewMouseLeftButtonDown="WpfPlotBoiler_OnPreviewMouseLeftButtonDown"/>
         <Border Grid.Row="2" x:Name="WpfPlotBoilerLoadingBlock" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="Gray" Opacity="0.2">
             <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="Loading..." FontSize="16" />
         </Border>

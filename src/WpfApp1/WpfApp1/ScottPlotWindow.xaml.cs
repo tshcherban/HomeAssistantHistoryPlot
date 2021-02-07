@@ -7,10 +7,13 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using ScottPlot;
 using ScottPlot.Plottable;
+using HorizontalAlignment = System.Windows.HorizontalAlignment;
+using VerticalAlignment = System.Windows.VerticalAlignment;
 
 namespace WpfApp1
 {
@@ -295,7 +298,7 @@ namespace WpfApp1
 
             WpfPlotGasData.plt.Clear();
 
-            var gasData = _haConnector.GetGasConsumption(_minDate, _maxDate.AddDays(1).AddTicks(-1));
+            var gasData = await _haConnector.GetGasConsumption(_minDate, _maxDate.AddDays(1).AddTicks(-1));
 
             double? prevAmount = null;
             double? prevDate = null;
@@ -443,6 +446,47 @@ namespace WpfApp1
         private void RefreshBtn_OnClick(object sender, RoutedEventArgs e)
         {
             InitPlot();
+        }
+
+        private void WpfPlotBoiler_OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (Keyboard.IsKeyDown(Key.T))
+            {
+                e.Handled = true;
+
+                var pnt = e.GetPosition(WpfPlotBoiler);
+
+                var dt = DateTime.FromOADate(WpfPlotBoiler.plt.GetCoordinateX((float) pnt.X));
+
+                var duration = TimeSpan.Zero;
+                var cycleDuration = TimeSpan.Zero;
+                var flameOnDuration = TimeSpan.Zero;
+
+                var inInterval = _flameActiveIntervals.FirstOrDefault(x => x.Start <= dt && x.End >= dt);
+                if (inInterval == null)
+                {
+                    var start = _flameActiveIntervals.LastOrDefault(x => x.End < dt);
+                    var end = _flameActiveIntervals.FirstOrDefault(x => x.Start > dt);
+
+                    duration = end?.Start - start?.End ?? TimeSpan.Zero;
+                    cycleDuration = end?.Start - start?.Start ?? TimeSpan.Zero;
+                    flameOnDuration = start?.End - start?.Start ?? TimeSpan.Zero;
+                }
+                else
+                {
+                    var nextStart = _flameActiveIntervals.FirstOrDefault(x => x.Start > dt);
+
+                    duration = inInterval.End - inInterval.Start;
+                    cycleDuration = nextStart?.Start - inInterval.Start ?? TimeSpan.Zero;
+                    flameOnDuration = inInterval.End - inInterval.Start;
+                }
+
+
+
+                var perc = cycleDuration == TimeSpan.Zero ? 0 : 100 / cycleDuration.TotalSeconds * flameOnDuration.TotalSeconds;
+
+                TextBlockSelectionInfo2.Text = $"{(int) duration.TotalMinutes}:{duration.Seconds:D2} ({perc:F0} %)";
+            }
         }
     }
 
